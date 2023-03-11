@@ -24,18 +24,22 @@ type Connection struct {
 	//告知当前连接已经退出的/停止 channel
 	ExitChan chan bool
 
-	//该连接处理的方法Router
-	Router ziface.IRouter
+	//无缓冲的管道， 用于读写协程之间的消息通信, 由reader告知write
+	msgChan chan []byte
+
+	//消息的管理MsgID 和毒药的业务处理API关系
+	MsgHandler ziface.IMsgHandle
 }
 
 // 初始化连接模块的方法
-func NewConnection(conn *net.TCPConn, connID uint32, router ziface.IRouter) *Connection {
+func NewConnection(conn *net.TCPConn, connID uint32, msgHandler ziface.IMsgHandle) *Connection {
 	c := &Connection{
-		Conn:     conn,
-		ConnID:   connID,
-		Router:   router,
-		isClosed: false,
-		ExitChan: make(chan bool, 1),
+		Conn:       conn,
+		ConnID:     connID,
+		MsgHandler: msgHandler,
+		isClosed:   false,
+		msgChan:    make(chan []byte),
+		ExitChan:   make(chan bool, 1),
 	}
 	return c
 }
@@ -43,7 +47,7 @@ func NewConnection(conn *net.TCPConn, connID uint32, router ziface.IRouter) *Con
 // 连接的读业务方法
 func (c *Connection) StartReader() {
 	fmt.Println("Reader Goroutine is running...")
-	defer fmt.Println("connID = ", c.ConnID, " Reader is exit, remote addr is ", c.RemoteAddr().String())
+	defer fmt.Println("connID = ", c.ConnID, " [Reader is exit!], remote addr is ", c.RemoteAddr().String())
 	defer c.Stop()
 
 	for {
@@ -87,14 +91,31 @@ func (c *Connection) StartReader() {
 			msg:  msg,
 		}
 
-		//执行注册的路由方法
-		go func(request ziface.IRequest) {
-			//从路由中，找到注册绑定的Conn对应的Router调用
-			c.Router.PreHandle(request)
-			c.Router.Handle(request)
-			c.Router.PostHandle(request)
-		}(&req)
+		//从路由中，找到注册绑定的Conn对应的Router调用
+		//根究绑定好的MsgID 找到对应处理api业务 执行
+		go c.MsgHandler.DoMsgHandler(&req)
+	}
+}
 
+/*
+写消息Gorourtine，专门发送客户端消息的模块
+*/
+func (c Connection) StartWriter() {
+	fmt.Println("[Write Goroutine is Running...]")
+	defer fmt.Println(c.RemoteAddr().String(), " [conn Writer exit!]")
+
+	//不断地阻塞等待channel的消息，写给客户端
+	for {
+		select {
+		case data := <-c.msgChan:
+			if _, err := c.Conn.Write(data); err != nil {
+				fmt.Println("Send data error, ", err)
+				return
+			}
+		case <-c.ExitChan:
+			//代表Reader已经退出，此时Writer也要退出
+			return
+		}
 	}
 }
 
@@ -104,7 +125,7 @@ func (c *Connection) Start() {
 	//启动当前连接的读数据业务
 	go c.StartReader()
 	//TODO 启动当前来连接写数据的业务
-
+	go c.StartWriter()
 }
 
 // 停止连接 结束当前连接的工作
@@ -118,8 +139,14 @@ func (c *Connection) Stop() {
 
 	//关闭socket连接
 	c.Conn.Close()
+
+	//告知Writer关闭
+	c.ExitChan <- true
+
 	//回收资源
 	close(c.ExitChan)
+
+	close(c.msgChan)
 }
 
 // 获取当前连接绑定的socket conn
@@ -154,10 +181,7 @@ func (c *Connection) SendMsg(msgId uint32, data []byte) error {
 	}
 
 	//将数据发送给客户端
-	if _, err := c.Conn.Write(binaryMsg); err != nil {
-		fmt.Println("Write msg id: ", msgId, "error :", err)
-		return errors.New("conn Write error")
-	}
+	c.msgChan <- binaryMsg
 
 	return nil
 }
