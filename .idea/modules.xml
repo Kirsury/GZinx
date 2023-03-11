@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/zinx.iml" filepath="$PROJECT_DIR$/.idea/zinx.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/GZinx.iml" filepath="$PROJECT_DIR$/.idea/GZinx.iml" />
     </modules>
   </component>
 </project>

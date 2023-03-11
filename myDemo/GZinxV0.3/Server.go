@@ -49,5 +49,5 @@ func main() {
 	//2 给当前server添加一个自定义的router
 	s.AddRouter(&PingRouter{})
 
-:	s.Serve()
+	s.Serve()
 }
