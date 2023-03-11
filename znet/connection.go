@@ -47,7 +47,7 @@ func NewConnection(conn *net.TCPConn, connID uint32, msgHandler ziface.IMsgHandl
 // 连接的读业务方法
 func (c *Connection) StartReader() {
 	fmt.Println("Reader Goroutine is running...")
-	defer fmt.Println("connID = ", c.ConnID, " [Reader is exit!], remote addr is ", c.RemoteAddr().String())
+	defer fmt.Println("[Reader is exit!], connID = ", c.ConnID, " remote addr is ", c.RemoteAddr().String())
 	defer c.Stop()
 
 	for {
@@ -102,7 +102,7 @@ func (c *Connection) StartReader() {
 */
 func (c Connection) StartWriter() {
 	fmt.Println("[Write Goroutine is Running...]")
-	defer fmt.Println(c.RemoteAddr().String(), " [conn Writer exit!]")
+	defer fmt.Println(" [conn Writer exit!] ", c.RemoteAddr().String())
 
 	//不断地阻塞等待channel的消息，写给客户端
 	for {
