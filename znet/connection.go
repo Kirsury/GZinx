@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"zinx/utils"
 	"zinx/ziface"
 )
 
@@ -91,16 +92,22 @@ func (c *Connection) StartReader() {
 			msg:  msg,
 		}
 
-		//从路由中，找到注册绑定的Conn对应的Router调用
-		//根究绑定好的MsgID 找到对应处理api业务 执行
-		go c.MsgHandler.DoMsgHandler(&req)
+		if utils.GlobalObject.WorkerPoolSize > 0 {
+			//已经开启了工作池机制，将消息发送给Worker工作池处理即可
+			c.MsgHandler.SendMsgToTaskQueue(&req)
+		} else {
+			//从路由中，找到注册绑定的Conn对应的Router调用
+			//根究绑定好的MsgID 找到对应处理api业务 执行
+			go c.MsgHandler.DoMsgHandler(&req)
+		}
+
 	}
 }
 
 /*
 写消息Gorourtine，专门发送客户端消息的模块
 */
-func (c Connection) StartWriter() {
+func (c *Connection) StartWriter() {
 	fmt.Println("[Write Goroutine is Running...]")
 	defer fmt.Println(" [conn Writer exit!] ", c.RemoteAddr().String())
 
