@@ -73,7 +73,7 @@ func DoConnectionLost(conn ziface.IConnection) {
 }
 
 func main() {
-	//1 创建一个server句柄，使用Zinx的api
+	//1 创建一个server句柄，使用GZinx的api
 	s := znet.NewServer("[zinx V0.10]")
 
 	//2 注册连接Hook钩子函数
